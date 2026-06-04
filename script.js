@@ -16,7 +16,7 @@ const TAX_RATES = {
 const SOCIAL_INSURANCE = {
     // Krankenversicherung (Arbeitnehmeranteil)
     KV_RATE: 0.073, // 7,3%
-    KV_ZUSATZBEITRAG: 0.027, // 2,7% Zusatzbeitrag
+    KV_ZUSATZBEITRAG_AN: 0.0135, // 50% von 2,7% Zusatzbeitrag = 1,35% (Arbeitnehmeranteil)
     
     // Rentenversicherung (Arbeitnehmeranteil)
     RV_RATE: 0.093, // 9,3%
@@ -69,7 +69,7 @@ function calculateIncomeTax(income) {
  * @returns {object} Aufschlüsselung der Sozialabzüge
  */
 function calculateSocialInsurance(brutto) {
-    const kv = brutto * (SOCIAL_INSURANCE.KV_RATE + SOCIAL_INSURANCE.KV_ZUSATZBEITRAG);
+    const kv = brutto * (SOCIAL_INSURANCE.KV_RATE + SOCIAL_INSURANCE.KV_ZUSATZBEITRAG_AN);
     const rv = brutto * SOCIAL_INSURANCE.RV_RATE;
     const pv = brutto * SOCIAL_INSURANCE.PV_RATE;
     const alv = brutto * SOCIAL_INSURANCE.ALV_RATE;
@@ -80,7 +80,7 @@ function calculateSocialInsurance(brutto) {
         pflegeversicherung: pv,
         arbeitslosenversicherung: alv,
         total: kv + rv + pv + alv,
-        kvRate: SOCIAL_INSURANCE.KV_RATE + SOCIAL_INSURANCE.KV_ZUSATZBITTRAG,
+        kvRate: SOCIAL_INSURANCE.KV_RATE + SOCIAL_INSURANCE.KV_ZUSATZBEITRAG_AN,
         rvRate: SOCIAL_INSURANCE.RV_RATE,
         pvRate: SOCIAL_INSURANCE.PV_RATE,
         alvRate: SOCIAL_INSURANCE.ALV_RATE,
@@ -117,7 +117,7 @@ function calculateNetIncome(brutto) {
     return {
         brutto,
         incomeTax,
-        crankenversicherung: socialInsurance.krankenversicherung,
+        krankenversicherung: socialInsurance.krankenversicherung,
         rentenversicherung: socialInsurance.rentenversicherung,
         pflegeversicherung: socialInsurance.pflegeversicherung,
         arbeitslosenversicherung: socialInsurance.arbeitslosenversicherung,
@@ -174,7 +174,7 @@ function displayResults(calculation) {
     document.getElementById('deductionTax').textContent = formatEuro(calculation.incomeTax);
     document.getElementById('percentageTax').textContent = formatPercent(calculation.taxPercentage);
     
-    document.getElementById('deductionKV').textContent = formatEuro(calculation.crankenversicherung);
+    document.getElementById('deductionKV').textContent = formatEuro(calculation.krankenversicherung);
     document.getElementById('percentageKV').textContent = formatPercent(calculation.kvPercentage);
     
     document.getElementById('deductionRV').textContent = formatEuro(calculation.rentenversicherung);
