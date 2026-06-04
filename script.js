@@ -23,7 +23,8 @@ const SOCIAL_INSURANCE = {
     PV_RATE: 0.0305, // 3,05%
     
     // Arbeitslosenversicherung (Arbeitnehmeranteil)
-    ALV_RATE: 0.026, // 2,6%
+    // 2,6% total - jeweils Hälfte von Arbeitnehmer und Arbeitgeber
+    ALV_RATE: 0.013, // 1,3% (Arbeitnehmeranteil, 50% von 2,6%)
 };
 
 /**
