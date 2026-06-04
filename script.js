@@ -1,9 +1,9 @@
 // 2026 Steuer- und Abgabensätze für Steuerklasse 1, unter 23 Jahren, keine Kinder
 const TAX_RATES = {
-    // Einkommensteuer Grundfreibetrag 2026 (wird nicht mehr verwendet, da Formel ab 12.349€ gilt)
+    // Einkommensteuer Grundfreibetrag 2026
     GRUNDFREIBETRAG: 12348,
     
-    // Solidaritätszuschlag (5,5% auf Einkommensteuer, ab 972€ ESt Jahressteuer)
+    // Solidaritätszuschlag (5,5% auf Einkommensteuer, ab 972€ ESt)
     SOLIDARITY_SURCHARGE: 0.055,
     SOLIDARITY_THRESHOLD: 972,
     
@@ -28,29 +28,29 @@ const SOCIAL_INSURANCE = {
 
 /**
  * Berechnet die Einkommensteuer nach §32a EStG (2026)
- * Formel für das zu versteuernde Einkommen (Jahreseinkommen)
- * @param {number} zvE - Zu versteuerndes Einkommen (Jahresgehalt)
+ * Formel für das zu versteuernde Einkommen (Jahreseinkommen nach Grundfreibetrag)
+ * @param {number} zvE - Zu versteuerndes Einkommen nach Grundfreibetrag (Jahresgehalt)
  * @returns {number} Einkommensteuer (Jahressteuer)
  */
 function calculateIncomeTax(zvE) {
-    if (zvE <= TAX_RATES.GRUNDFREIBETRAG) {
+    if (zvE <= 0) {
         return 0; // a) bis 12.348 Euro
-    } else if (zvE <= 17799) {
-        // b) von 12.349 Euro bis 17.799 Euro
+    } else if (zvE <= 5451) {
+        // b) von 0 bis 5.451 Euro (entspricht 12.349 bis 17.799 Euro Gesamteinkommen)
         // ESt = (914,51 * y + 1.400) * y
-        const y = (zvE - 12348) / 10000;
+        const y = zvE / 10000;
         return (914.51 * y + 1400) * y;
-    } else if (zvE <= 69878) {
-        // c) von 17.800 Euro bis 69.878 Euro
+    } else if (zvE <= 57079) {
+        // c) von 5.452 bis 57.079 Euro (entspricht 17.800 bis 69.878 Euro Gesamteinkommen)
         // ESt = (173,1 * z + 2.397) * z + 1.034,87
-        const z = (zvE - 17799) / 10000;
+        const z = (zvE - 5451) / 10000;
         return (173.1 * z + 2397) * z + 1034.87;
-    } else if (zvE <= 277825) {
-        // d) von 69.879 Euro bis 277.825 Euro
+    } else if (zvE <= 265477) {
+        // d) von 57.080 bis 265.477 Euro (entspricht 69.879 bis 277.825 Euro Gesamteinkommen)
         // ESt = 0,42 * zvE - 11.135,63
         return 0.42 * zvE - 11135.63;
     } else {
-        // e) ab 277.826 Euro
+        // e) ab 265.478 Euro (entspricht ab 277.826 Euro Gesamteinkommen)
         // ESt = 0,45 * zvE - 19.470,38
         return 0.45 * zvE - 19470.38;
     }
@@ -102,11 +102,12 @@ function calculateNetIncome(bruttoMonatlich) {
     const socialInsurance = calculateSocialInsurance(bruttoMonatlich);
     
     // Schritt 3: Zu versteuerndes Einkommen berechnen (jährlich)
-    // zvE = Brutto - Sozialversicherungsabzüge (jährlich)
+    // zvE = Brutto - Sozialversicherungsabzüge (jährlich) - Grundfreibetrag
     const steuerlichesEinkommenJaehrlich = Math.max(0, bruttoJaehrlich - (socialInsurance.total * 12));
+    const zvEAbsGrunds = Math.max(0, steuerlichesEinkommenJaehrlich - TAX_RATES.GRUNDFREIBETRAG);
     
     // Schritt 4: Einkommensteuer berechnen nach §32a EStG (Jahressteuer)
-    const incomeTaxJaehrlich = calculateIncomeTax(steuerlichesEinkommenJaehrlich);
+    const incomeTaxJaehrlich = calculateIncomeTax(zvEAbsGrunds);
     
     // Schritt 5: Solidaritätszuschlag berechnen (auf Jahressteuer)
     let solidarityTax = 0;
