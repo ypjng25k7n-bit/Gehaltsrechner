@@ -1,14 +1,9 @@
 // 2026 Steuer- und Abgabensätze für Steuerklasse 1, unter 23 Jahren, keine Kinder
 const TAX_RATES = {
-    // Einkommensteuer Grundfreibetrag 2026
-    GRUNDFREIBETRAG: 11600,
+    // Einkommensteuer Grundfreibetrag 2026 (wird nicht mehr verwendet, da Formel ab 12.349€ gilt)
+    GRUNDFREIBETRAG: 12348,
     
-    // Progressionszonen für Einkommensteuer (vereinfacht)
-    PROGRESSION_ZONE_1: { bis: 15000, rate: 0.14 },
-    PROGRESSION_ZONE_2: { bis: 41500, rate: 0.42 },
-    PROGRESSION_ZONE_3: { bis: 62500, rate: 0.45 },
-    
-    // Solidaritätszuschlag (5,5% auf Einkommensteuer, ab 972€ ESt)
+    // Solidaritätszuschlag (5,5% auf Einkommensteuer, ab 972€ ESt Jahressteuer)
     SOLIDARITY_SURCHARGE: 0.055,
     SOLIDARITY_THRESHOLD: 972,
     
@@ -32,44 +27,39 @@ const SOCIAL_INSURANCE = {
 };
 
 /**
- * Berechnet die Einkommensteuer nach dem deutschen Steuertarif 2026
- * @param {number} income - Zu versteuerndes Einkommen (nach Grundfreibetrag)
- * @returns {number} Einkommensteuer
+ * Berechnet die Einkommensteuer nach §32a EStG (2026)
+ * Formel für das zu versteuernde Einkommen (Jahreseinkommen)
+ * @param {number} zvE - Zu versteuerndes Einkommen (Jahresgehalt)
+ * @returns {number} Einkommensteuer (Jahressteuer)
  */
-function calculateIncomeTax(income) {
-    if (income <= 0) return 0;
-
-    let tax = 0;
-    
-    // Vereinfachte Berechnung mit Progressionszonen
-    if (income <= TAX_RATES.PROGRESSION_ZONE_1.bis) {
-        tax = income * TAX_RATES.PROGRESSION_ZONE_1.rate;
-    } else if (income <= TAX_RATES.PROGRESSION_ZONE_2.bis) {
-        tax = TAX_RATES.PROGRESSION_ZONE_1.bis * TAX_RATES.PROGRESSION_ZONE_1.rate;
-        tax += (income - TAX_RATES.PROGRESSION_ZONE_1.bis) * TAX_RATES.PROGRESSION_ZONE_2.rate;
-    } else if (income <= TAX_RATES.PROGRESSION_ZONE_3.bis) {
-        tax = TAX_RATES.PROGRESSION_ZONE_1.bis * TAX_RATES.PROGRESSION_ZONE_1.rate;
-        tax += (TAX_RATES.PROGRESSION_ZONE_2.bis - TAX_RATES.PROGRESSION_ZONE_1.bis) * TAX_RATES.PROGRESSION_ZONE_2.rate;
-        tax += (income - TAX_RATES.PROGRESSION_ZONE_2.bis) * TAX_RATES.PROGRESSION_ZONE_3.rate;
+function calculateIncomeTax(zvE) {
+    if (zvE <= TAX_RATES.GRUNDFREIBETRAG) {
+        return 0; // a) bis 12.348 Euro
+    } else if (zvE <= 17799) {
+        // b) von 12.349 Euro bis 17.799 Euro
+        // ESt = (914,51 * y + 1.400) * y
+        const y = (zvE - 12348) / 10000;
+        return (914.51 * y + 1400) * y;
+    } else if (zvE <= 69878) {
+        // c) von 17.800 Euro bis 69.878 Euro
+        // ESt = (173,1 * z + 2.397) * z + 1.034,87
+        const z = (zvE - 17799) / 10000;
+        return (173.1 * z + 2397) * z + 1034.87;
+    } else if (zvE <= 277825) {
+        // d) von 69.879 Euro bis 277.825 Euro
+        // ESt = 0,42 * zvE - 11.135,63
+        return 0.42 * zvE - 11135.63;
     } else {
-        tax = TAX_RATES.PROGRESSION_ZONE_1.bis * TAX_RATES.PROGRESSION_ZONE_1.rate;
-        tax += (TAX_RATES.PROGRESSION_ZONE_2.bis - TAX_RATES.PROGRESSION_ZONE_1.bis) * TAX_RATES.PROGRESSION_ZONE_2.rate;
-        tax += (TAX_RATES.PROGRESSION_ZONE_3.bis - TAX_RATES.PROGRESSION_ZONE_2.bis) * TAX_RATES.PROGRESSION_ZONE_3.rate;
-        tax += (income - TAX_RATES.PROGRESSION_ZONE_3.bis) * 0.42; // Spitzensatz
+        // e) ab 277.826 Euro
+        // ESt = 0,45 * zvE - 19.470,38
+        return 0.45 * zvE - 19470.38;
     }
-
-    // Solidaritätszuschlag
-    if (tax >= TAX_RATES.SOLIDARITY_THRESHOLD) {
-        tax += tax * TAX_RATES.SOLIDARITY_SURCHARGE;
-    }
-
-    return tax;
 }
 
 /**
  * Berechnet die Kirchensteuer
- * @param {number} incomeTax - Einkommensteuer
- * @returns {number} Kirchensteuer
+ * @param {number} incomeTax - Einkommensteuer (Jahressteuer)
+ * @returns {number} Kirchensteuer (Jahressteuer)
  */
 function calculateKirchensteuer(incomeTax) {
     return incomeTax * TAX_RATES.KIRCHENSTEUER_RATE;
@@ -77,8 +67,8 @@ function calculateKirchensteuer(incomeTax) {
 
 /**
  * Berechnet die Sozialversicherungsabzüge
- * @param {number} brutto - Bruttogehalt
- * @returns {object} Aufschlüsselung der Sozialabzüge
+ * @param {number} brutto - Bruttogehalt (monatlich)
+ * @returns {object} Aufschlüsselung der Sozialabzüge (monatlich)
  */
 function calculateSocialInsurance(brutto) {
     const kv = brutto * (SOCIAL_INSURANCE.KV_RATE + SOCIAL_INSURANCE.KV_ZUSATZBEITRAG_AN);
@@ -101,45 +91,61 @@ function calculateSocialInsurance(brutto) {
 
 /**
  * Hauptberechnung: Brutto zu Netto
- * @param {number} brutto - Bruttogehalt
+ * @param {number} bruttoMonatlich - Bruttogehalt (monatlich)
  * @returns {object} Detaillierte Aufschlüsselung
  */
-function calculateNetIncome(brutto) {
-    // Schritt 1: Sozialversicherung berechnen
-    const socialInsurance = calculateSocialInsurance(brutto);
+function calculateNetIncome(bruttoMonatlich) {
+    // Schritt 1: Jahresgehalt berechnen
+    const bruttoJaehrlich = bruttoMonatlich * 12;
     
-    // Schritt 2: Zu versteuerndes Einkommen berechnen
-    const steuerlichesEinkommen = Math.max(0, brutto - socialInsurance.total);
+    // Schritt 2: Sozialversicherung berechnen (monatlich)
+    const socialInsurance = calculateSocialInsurance(bruttoMonatlich);
     
-    // Schritt 3: Einkommensteuer berechnen (nach Grundfreibetrag)
-    const steuerbares = Math.max(0, steuerlichesEinkommen - TAX_RATES.GRUNDFREIBETRAG);
-    const incomeTax = calculateIncomeTax(steuerbares);
+    // Schritt 3: Zu versteuerndes Einkommen berechnen (jährlich)
+    // zvE = Brutto - Sozialversicherungsabzüge (jährlich)
+    const steuerlichesEinkommenJaehrlich = Math.max(0, bruttoJaehrlich - (socialInsurance.total * 12));
+    
+    // Schritt 4: Einkommensteuer berechnen nach §32a EStG (Jahressteuer)
+    const incomeTaxJaehrlich = calculateIncomeTax(steuerlichesEinkommenJaehrlich);
+    
+    // Schritt 5: Solidaritätszuschlag berechnen (auf Jahressteuer)
+    let solidarityTax = 0;
+    if (incomeTaxJaehrlich >= TAX_RATES.SOLIDARITY_THRESHOLD) {
+        solidarityTax = incomeTaxJaehrlich * TAX_RATES.SOLIDARITY_SURCHARGE;
+    }
+    
+    // Schritt 6: Gesamte Einkommensteuer + Solidaritätszuschlag (Jahressteuer)
+    const totalIncomeTaxJaehrlich = incomeTaxJaehrlich + solidarityTax;
 
-    // Schritt 4: Kirchensteuer berechnen
-    const kirchensteuer = calculateKirchensteuer(incomeTax);
+    // Schritt 7: Kirchensteuer berechnen (Jahressteuer)
+    const kirchensteuerJaehrlich = calculateKirchensteuer(totalIncomeTaxJaehrlich);
 
-    // Schritt 5: Netto berechnen
-    const netto = brutto - socialInsurance.total - incomeTax - kirchensteuer;
+    // Schritt 8: Monatliche Steuern berechnen (für Anzeige)
+    const incomeTaxMonatlich = totalIncomeTaxJaehrlich / 12;
+    const kirchensteuerMonatlich = kirchensteuerJaehrlich / 12;
 
-    // Berechnung der Prozentsätze für Anzeige
-    const totalDeductions = socialInsurance.total + incomeTax + kirchensteuer;
-    const taxPercentage = brutto > 0 ? (incomeTax / brutto * 100) : 0;
-    const kirchensteuerPercentage = brutto > 0 ? (kirchensteuer / brutto * 100) : 0;
-    const kvPercentage = brutto > 0 ? (socialInsurance.krankenversicherung / brutto * 100) : 0;
-    const rvPercentage = brutto > 0 ? (socialInsurance.rentenversicherung / brutto * 100) : 0;
-    const pvPercentage = brutto > 0 ? (socialInsurance.pflegeversicherung / brutto * 100) : 0;
-    const alvPercentage = brutto > 0 ? (socialInsurance.arbeitslosenversicherung / brutto * 100) : 0;
+    // Schritt 9: Netto berechnen (monatlich)
+    const nettoMonatlich = bruttoMonatlich - socialInsurance.total - incomeTaxMonatlich - kirchensteuerMonatlich;
+
+    // Berechnung der Prozentsätze für Anzeige (basierend auf monatlichem Brutto)
+    const totalDeductions = socialInsurance.total + incomeTaxMonatlich + kirchensteuerMonatlich;
+    const taxPercentage = bruttoMonatlich > 0 ? (incomeTaxMonatlich / bruttoMonatlich * 100) : 0;
+    const kirchensteuerPercentage = bruttoMonatlich > 0 ? (kirchensteuerMonatlich / bruttoMonatlich * 100) : 0;
+    const kvPercentage = bruttoMonatlich > 0 ? (socialInsurance.krankenversicherung / bruttoMonatlich * 100) : 0;
+    const rvPercentage = bruttoMonatlich > 0 ? (socialInsurance.rentenversicherung / bruttoMonatlich * 100) : 0;
+    const pvPercentage = bruttoMonatlich > 0 ? (socialInsurance.pflegeversicherung / bruttoMonatlich * 100) : 0;
+    const alvPercentage = bruttoMonatlich > 0 ? (socialInsurance.arbeitslosenversicherung / bruttoMonatlich * 100) : 0;
 
     return {
-        brutto,
-        incomeTax,
-        kirchensteuer,
+        brutto: bruttoMonatlich,
+        incomeTax: incomeTaxMonatlich,
+        kirchensteuer: kirchensteuerMonatlich,
         krankenversicherung: socialInsurance.krankenversicherung,
         rentenversicherung: socialInsurance.rentenversicherung,
         pflegeversicherung: socialInsurance.pflegeversicherung,
         arbeitslosenversicherung: socialInsurance.arbeitslosenversicherung,
         totalDeductions,
-        netto,
+        netto: nettoMonatlich,
         taxPercentage,
         kirchensteuerPercentage,
         kvPercentage,
