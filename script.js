@@ -11,6 +11,9 @@ const TAX_RATES = {
     // Solidaritätszuschlag (5,5% auf Einkommensteuer, ab 972€ ESt)
     SOLIDARITY_SURCHARGE: 0.055,
     SOLIDARITY_THRESHOLD: 972,
+    
+    // Kirchensteuer (Person ist nicht in der Kirche - 0%)
+    KIRCHENSTEUER_RATE: 0.0, // 0% da nicht kirchlich
 };
 
 const SOCIAL_INSURANCE = {
@@ -64,6 +67,15 @@ function calculateIncomeTax(income) {
 }
 
 /**
+ * Berechnet die Kirchensteuer
+ * @param {number} incomeTax - Einkommensteuer
+ * @returns {number} Kirchensteuer
+ */
+function calculateKirchensteuer(incomeTax) {
+    return incomeTax * TAX_RATES.KIRCHENSTEUER_RATE;
+}
+
+/**
  * Berechnet die Sozialversicherungsabzüge
  * @param {number} brutto - Bruttogehalt
  * @returns {object} Aufschlüsselung der Sozialabzüge
@@ -103,12 +115,16 @@ function calculateNetIncome(brutto) {
     const steuerbares = Math.max(0, steuerlichesEinkommen - TAX_RATES.GRUNDFREIBETRAG);
     const incomeTax = calculateIncomeTax(steuerbares);
 
-    // Schritt 4: Netto berechnen
-    const netto = brutto - socialInsurance.total - incomeTax;
+    // Schritt 4: Kirchensteuer berechnen
+    const kirchensteuer = calculateKirchensteuer(incomeTax);
+
+    // Schritt 5: Netto berechnen
+    const netto = brutto - socialInsurance.total - incomeTax - kirchensteuer;
 
     // Berechnung der Prozentsätze für Anzeige
-    const totalDeductions = socialInsurance.total + incomeTax;
+    const totalDeductions = socialInsurance.total + incomeTax + kirchensteuer;
     const taxPercentage = brutto > 0 ? (incomeTax / brutto * 100) : 0;
+    const kirchensteuerPercentage = brutto > 0 ? (kirchensteuer / brutto * 100) : 0;
     const kvPercentage = brutto > 0 ? (socialInsurance.krankenversicherung / brutto * 100) : 0;
     const rvPercentage = brutto > 0 ? (socialInsurance.rentenversicherung / brutto * 100) : 0;
     const pvPercentage = brutto > 0 ? (socialInsurance.pflegeversicherung / brutto * 100) : 0;
@@ -117,6 +133,7 @@ function calculateNetIncome(brutto) {
     return {
         brutto,
         incomeTax,
+        kirchensteuer,
         krankenversicherung: socialInsurance.krankenversicherung,
         rentenversicherung: socialInsurance.rentenversicherung,
         pflegeversicherung: socialInsurance.pflegeversicherung,
@@ -124,6 +141,7 @@ function calculateNetIncome(brutto) {
         totalDeductions,
         netto,
         taxPercentage,
+        kirchensteuerPercentage,
         kvPercentage,
         rvPercentage,
         pvPercentage,
@@ -173,6 +191,9 @@ function displayResults(calculation) {
     // Abzüge anzeigen
     document.getElementById('deductionTax').textContent = formatEuro(calculation.incomeTax);
     document.getElementById('percentageTax').textContent = formatPercent(calculation.taxPercentage);
+    
+    document.getElementById('deductionKirchensteuer').textContent = formatEuro(calculation.kirchensteuer);
+    document.getElementById('percentageKirchensteuer').textContent = formatPercent(calculation.kirchensteuerPercentage);
     
     document.getElementById('deductionKV').textContent = formatEuro(calculation.krankenversicherung);
     document.getElementById('percentageKV').textContent = formatPercent(calculation.kvPercentage);
